@@ -108,7 +108,8 @@
         }
 
         html {
-            scroll-behavior: smooth;
+            /* Fragment navigation must jump immediately, even in the Wix iframe. */
+            scroll-behavior: auto;
         }
 
         body {
@@ -6470,20 +6471,22 @@
             if (cloud) setImageryExpanded(cloud, true);
         }
 
-        function navigateToNovel(id) {
+        function navigateToNovel(id, { updateHistory = true } = {}) {
             const target = document.getElementById(id);
             if (!target) return;
             closeOceanicModal({ restoreFocus: false });
             revealAtlasTarget(target);
             const hash = '#' + id;
-            if (window.location.hash !== hash) {
+            if (updateHistory && window.location.hash !== hash) {
                 try { window.history.pushState(null, '', hash); }
                 catch (_) { window.location.hash = hash; }
             }
             const focusTarget = target.matches('.oceanic-cloud > span') ? target : target.querySelector('h2, h3') || target;
             focusTarget.setAttribute('tabindex', '-1');
             focusTarget.focus({ preventScroll: true });
-            target.scrollIntoView({ behavior: atlasScrollBehavior(), block: 'start' });
+            // Do not animate across tens of thousands of pixels or leave the
+            // destination outside the embedding page's visible viewport.
+            target.scrollIntoView({ behavior: 'instant', block: 'start', inline: 'nearest' });
             document.querySelectorAll('.phrase-highlight').forEach(element => element.classList.remove('phrase-highlight'));
             if (target.matches('.oceanic-cloud > span')) target.classList.add('phrase-highlight');
         }
@@ -6520,11 +6523,16 @@
                 let id;
                 try { id = decodeURIComponent(window.location.hash.slice(1)); } catch (_) { return; }
                 const target = document.getElementById(id);
-                if (target) revealAtlasTarget(target);
+                if (target) navigateToNovel(id, { updateHistory: false });
             };
             window.addEventListener('hashchange', revealHash);
             window.addEventListener('popstate', revealHash);
-            revealHash();
+            // Wait for the novel cards and other initial layout to be present.
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', revealHash, { once: true });
+            } else {
+                revealHash();
+            }
         }
 
         // Active nav state on scroll
